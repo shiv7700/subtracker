@@ -1,6 +1,6 @@
--- SubTracker schema. Paste-ready for the Supabase SQL editor.
--- Creates the subscriptions table, enables RLS, and adds per-user policies
--- so each authenticated user can only touch their own rows.
+-- Migration: create subscriptions table with per-user RLS.
+-- Applied via `supabase db push` (or paste into the Supabase SQL editor).
+-- Each authenticated user can only touch their own rows.
 
 create table if not exists public.subscriptions (
   id                uuid        primary key default gen_random_uuid(),

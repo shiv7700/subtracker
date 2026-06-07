@@ -5,17 +5,32 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 /**
  * Paths reachable WITHOUT an authenticated session.
- * - /login: the only entry point (no public signup).
+ * - "/": the login home (no public signup).
  * - /api/check-reminders: cron endpoint, guarded by its own CRON_SECRET.
  */
 function isPublicPath(pathname: string): boolean {
-  return pathname === "/login" || pathname.startsWith("/api/check-reminders");
+  return pathname === "/" || pathname.startsWith("/api/check-reminders");
+}
+
+/** Clone `request`'s URL with a new pathname, carrying over the refreshed cookies. */
+function redirectTo(
+  request: NextRequest,
+  pathname: string,
+  fromResponse: NextResponse,
+): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  const redirectResponse = NextResponse.redirect(url);
+  for (const cookie of fromResponse.cookies.getAll()) {
+    redirectResponse.cookies.set(cookie);
+  }
+  return redirectResponse;
 }
 
 /**
  * Standard @supabase/ssr middleware helper. Refreshes the auth session cookie
- * on every request and, for protected paths, redirects unauthenticated users
- * to /login.
+ * on every request. Unauthenticated users on protected paths go to "/" (login);
+ * authenticated users landing on "/" are sent to /dashboard.
  *
  * IMPORTANT (per @supabase/ssr docs): we must return the `supabaseResponse`
  * object as-is so the refreshed cookies survive. When we redirect, we copy the
@@ -53,15 +68,14 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
 
   const { pathname } = request.nextUrl;
 
+  // Unauthenticated → send to the login home (except public paths).
   if (!user && !isPublicPath(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    const redirectResponse = NextResponse.redirect(url);
-    // Preserve the refreshed auth cookies on the redirect.
-    for (const cookie of supabaseResponse.cookies.getAll()) {
-      redirectResponse.cookies.set(cookie);
-    }
-    return redirectResponse;
+    return redirectTo(request, "/", supabaseResponse);
+  }
+
+  // Already signed in but sitting on the login home → go straight to the dashboard.
+  if (user && pathname === "/") {
+    return redirectTo(request, "/dashboard", supabaseResponse);
   }
 
   return supabaseResponse;

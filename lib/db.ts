@@ -2,7 +2,7 @@
 // the app codes against plain typed functions, not the Supabase SDK.
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { daysUntil, isDueWithin } from "@/lib/dates";
+import { daysUntil } from "@/lib/dates";
 import type {
   Subscription,
   NewSubscription,
@@ -55,12 +55,41 @@ export async function createSubscription(
       amount: input.amount,
       cycle: input.cycle,
       next_billing_date: input.next_billing_date,
+      reminder_days_before: input.reminder_days_before,
     })
     .select("*")
     .single();
 
   if (error) {
     throw new Error(`Failed to create subscription: ${error.message}`);
+  }
+  return data as Subscription;
+}
+
+/**
+ * Update one of the current user's subscriptions by id.
+ * RLS ensures a user can only update their own rows.
+ */
+export async function updateSubscription(
+  id: string,
+  input: NewSubscription,
+): Promise<Subscription> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .update({
+      name: input.name,
+      amount: input.amount,
+      cycle: input.cycle,
+      next_billing_date: input.next_billing_date,
+      reminder_days_before: input.reminder_days_before,
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update subscription: ${error.message}`);
   }
   return data as Subscription;
 }
@@ -79,13 +108,12 @@ export async function deleteSubscription(id: string): Promise<void> {
 }
 
 /**
- * Find every subscription (across ALL users) whose next charge falls within
- * the next `windowDays` days. Used by the cron reminder check, so it uses the
- * admin client to bypass RLS. Each row is enriched with days_until.
+ * Find every subscription (across ALL users) that should be reminded TODAY —
+ * i.e. days-until-charge exactly equals its per-subscription reminder lead time.
+ * This fires once (on the matching day), not every day in a window.
+ * Used by the daily cron, so it uses the admin client to bypass RLS.
  */
-export async function getDueSubscriptions(
-  windowDays: number,
-): Promise<DueSubscription[]> {
+export async function getDueReminders(): Promise<DueSubscription[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("subscriptions")
@@ -93,14 +121,11 @@ export async function getDueSubscriptions(
     .order("next_billing_date", { ascending: true });
 
   if (error) {
-    throw new Error(`Failed to read due subscriptions: ${error.message}`);
+    throw new Error(`Failed to read due reminders: ${error.message}`);
   }
 
   const rows = (data ?? []) as Subscription[];
   return rows
-    .filter((sub) => isDueWithin(sub.next_billing_date, windowDays))
-    .map((sub) => ({
-      ...sub,
-      days_until: daysUntil(sub.next_billing_date),
-    }));
+    .map((sub) => ({ ...sub, days_until: daysUntil(sub.next_billing_date) }))
+    .filter((sub) => sub.days_until === sub.reminder_days_before);
 }

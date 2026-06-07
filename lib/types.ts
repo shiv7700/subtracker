@@ -12,6 +12,8 @@ export interface Subscription {
   cycle: BillingCycle;
   /** Next charge date, ISO calendar date: "YYYY-MM-DD". */
   next_billing_date: string;
+  /** Days before the charge to send the reminder (fires once). 0–30. */
+  reminder_days_before: number;
   /** Row creation timestamp, ISO. */
   created_at: string;
 }
@@ -22,6 +24,7 @@ export interface NewSubscription {
   amount: number;
   cycle: BillingCycle;
   next_billing_date: string; // "YYYY-MM-DD"
+  reminder_days_before: number; // 0–30
 }
 
 /** A subscription that is due soon, returned by /api/check-reminders. */

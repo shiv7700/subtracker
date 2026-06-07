@@ -14,13 +14,22 @@ accounts, pasting keys, deploying). Do them in order.
 2. Pick a name, a strong DB password, and a region close to you.
 3. Wait for it to finish provisioning (~2 min).
 
-## 2. Create the database table
+## 2. Create the database table (run the migration)
 
-1. In your project, open **SQL Editor → New query**.
-2. Paste the entire contents of [`supabase/schema.sql`](./supabase/schema.sql)
-   and click **Run**.
-3. This creates the `subscriptions` table, enables RLS, and adds the per-user
-   policies. You should see "Success".
+Migrations live in [`supabase/migrations/`](./supabase/migrations) as timestamped
+SQL files. Apply them **by hand in the Supabase SQL editor**:
+
+1. Open **SQL Editor → New query** in your Supabase project.
+2. Apply **each** file in [`supabase/migrations/`](./supabase/migrations) in
+   **filename order (oldest first)** — paste its contents and **Run**. Currently:
+   - `20260606200615_create_subscriptions.sql` (table + RLS)
+   - `20260607101951_add_reminder_days_before.sql` (per-sub reminder lead time)
+3. You should see "Success". Verify the `subscriptions` table under **Table Editor**.
+
+> **Convention going forward:** every schema change is a **new** timestamped file in
+> `supabase/migrations/` (e.g. `YYYYMMDDHHmmss_what_changed.sql`). Apply them in
+> filename order (oldest → newest) by pasting each into the SQL editor. The SQL is
+> written to be safely re-runnable.
 
 ## 3. Create your single user (and turn off public signups)
 
