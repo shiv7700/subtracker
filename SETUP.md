@@ -86,20 +86,32 @@ That's it — the core loop (warn before a charge) is live.
 
 ---
 
-## 8. Phase 5 (later) — switch reminders to WhatsApp
+## 8. Phase 5 — switch reminders to WhatsApp
 
-Until now reminders only print to the server logs. To get them on WhatsApp:
+Reminders **auto-route**: set the `WHATSAPP_*` env vars and `notify()` sends
+WhatsApp; leave them blank and it logs to the console. **No code change needed.**
 
-1. In **Meta for Developers** (<https://developers.facebook.com>), create an app
-   with the **WhatsApp** product. Use the free test number to start.
-2. Create and get **approved** a message **template** with a body of a single
-   variable, e.g. body text `{{1}}` (or `SubTracker reminder: {{1}}`).
-3. From **WhatsApp → API Setup**, collect the access token and the **Phone
-   Number ID**, and add your own number as a recipient.
-4. Fill the `WHATSAPP_*` vars in `.env.local` (and in Vercel):
-   `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TO` (your number,
-   digits only), `WHATSAPP_TEMPLATE` (the approved template name).
-5. In [`lib/notifier.ts`](./lib/notifier.ts), inside `notify()`, comment out the
-   `console.log(message)` line and uncomment `await sendWhatsApp(message);`
-   (the "PHASE 5 SWAP" note marks the exact spot).
-6. Redeploy. The next daily cron run will message you on WhatsApp.
+1. **Meta for Developers** (<https://developers.facebook.com>) → create an app
+   (Business) → add the **WhatsApp** product. You get a free **test number**.
+2. In **WhatsApp → API Setup**: add your own number under **recipients** and
+   verify it (the test number can message ~5 verified numbers). Copy the
+   **temporary access token** and the **Phone number ID** shown there.
+   - (For a token that won't expire in 24h, later create a System User token.)
+3. Create a **message template** (**WhatsApp Manager → Templates**), category
+   **Utility**, language **English (US)**, body = exactly one variable: `{{1}}`
+   (or `SubTracker reminder: {{1}}`). Submit — utility templates usually approve
+   within minutes.
+4. Set these env vars in **`.env.local`** and on **Vercel** (Project Settings →
+   Environment Variables):
+   - `WHATSAPP_TOKEN` — the access token
+   - `WHATSAPP_PHONE_NUMBER_ID` — the Phone number ID (NOT the phone number)
+   - `WHATSAPP_TO` — your number, international digits only (e.g. `9198XXXXXXXX`)
+   - `WHATSAPP_TEMPLATE` — the approved template name
+   - `WHATSAPP_TEMPLATE_LANG` — `en_US` (match the template's language)
+5. Redeploy. The next daily cron messages you on WhatsApp. To test immediately,
+   make sure a subscription's days-until-charge equals its "remind X days before"
+   (e.g. reminder = "On the day" + date = today), then hit the endpoint:
+   ```bash
+   curl https://<your-app>.vercel.app/api/check-reminders \
+     -H "Authorization: Bearer $CRON_SECRET"
+   ```

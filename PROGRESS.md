@@ -20,10 +20,10 @@
 
 ## 📍 Current status
 
-- **Active phase:** ✅ **Running locally against real Supabase.** Backend end-to-end verified (2026-06-07).
-- **Verified (curl):** `/` → 307 → /login (auth guard) · `/login` → 200 · `/api/check-reminders` bina secret → 401, secret ke saath → 200 `{checked:0,due:[],notified:0}` (table exists, Supabase connected).
-- **Next up (TUM):** Browser me `localhost:3000` → login → ek subscription add (date 1–2 din aage) → reminder loop test. Phir Vercel deploy.
-- **Pending:** Signup OFF confirm karna · Vercel deploy · Phase 5 WhatsApp swap.
+- **Active phase:** 🚀 **DEPLOYED on Vercel** (push + env secrets done, 2026-06-07). App live + locked.
+- **Routing:** `/` = login, `/dashboard` = app, `/account` = profile. Middleware auth-guard.
+- **Next up:** Phase 5 — WhatsApp (Meta Cloud API + 1-line notifier swap). Baaki sab live.
+- **Pending:** Phase 5 WhatsApp — **blocked on Meta dev-account onboarding** (email "cannot be sent" bug, Meta-side). Code ready, bas env baaki. (Migration ✅ run ho gayi; cron/URL verify optional.)
 
 ---
 
@@ -94,8 +94,8 @@
 
 - [ ] ⬜ **5.1** Meta Cloud API setup — test number + app + token → **TUM (SETUP.md §8)**
 - [ ] ⬜ **5.2** Approved template → **TUM (SETUP.md §8)**
-- [~] 🟡 **5.3** `sendWhatsApp()` code `lib/notifier.ts` me **likha hua ready**; bas "PHASE 5 SWAP" pe `console.log` → `sendWhatsApp` uncomment (TUM)
-- [ ] ⬜ **5.4** Apne number pe live test → **TUM**
+- [x] ✅ **5.3** Notifier **auto-routes** — `WHATSAPP_*` env set → WhatsApp, warna console. **No code swap** (template lang env-configurable). Code done.
+- [ ] ⬜ **5.4** Env vars set (local + Vercel) + apne number pe live test → **TUM**
 
 **Phase 5 done jab:** Charge se 2–3 din pehle WhatsApp pe message aaye. 🎉 (Code ready, external + 1-line swap baaki.)
 
@@ -154,9 +154,9 @@
 ---
 
 ### Phase 6 — Deploy 🚀
-- [ ] ⬜ **6.1** Vercel pe project connect + env vars
-- [ ] ⬜ **6.2** Cron live verify (DB roz touch → Supabase pause na ho)
-- [ ] ⬜ **6.3** Public URL pe login test (locked confirm)
+- [x] ✅ **6.1** Vercel pe project connect + env vars (push + secrets done, 2026-06-07)
+- [x] ✅ **6.2** Cron live — Vercel → Cron Jobs me `/api/check-reminders` `30 3 * * *` (03:30 UTC ≈ 09:00 IST), **Enabled** (verified 2026-06-07). Manual "Run" + "View Logs" available.
+- [ ] 🟡 **6.3** Public URL pe login + add subscription test (locked confirm) — quick verify baaki
 
 ---
 
@@ -213,4 +213,5 @@
 - **2026-06-07** — **Account page (Phase 11):** `/account` — email (read-only) + name/phone editable (Supabase `user_metadata`) + created/last-updated. `useUser`/`useUpdateProfile`, `profileSchema`. Phone display-only. Playwright se verify.
 - **2026-06-07** — **Shared nav:** `components/AppHeader` (logo + Dashboard · Account · Sign out, active highlight via `usePathname`) — dono pages pe consistent, inline headers hata. Playwright se verify.
 - **2026-06-07** — **fetch → axios:** `lib/api.ts` central instance (baseURL `/api` + error-normalize interceptor); subscription hooks ab `api.get/post/patch/delete` use karte; `errorFromResponse` helper hata (auth hooks supabase SDK pe hi). `tsc`+`build` clean.
-- **2026-06-07** — **Per-sub reminder lead time:** naya column `reminder_days_before` (migration `20260607101951`), "Remind me" dropdown (on-day/1/2/3/5/7, bounded 0–30 in API+DB), cron ab exactly us din ek baar fire karta (`getDueSubscriptions`→`getDueReminders`). ⚠️ **Migration run karni hogi warna add/edit fail (column missing).** Playwright se dropdown verify. **Bacha:** migration apply (TUM), Vercel deploy, Phase 5 WhatsApp.
+- **2026-06-07** — **Per-sub reminder lead time:** naya column `reminder_days_before` (migration `20260607101951`), "Remind me" dropdown (on-day/1/2/3/5/7, bounded 0–30 in API+DB), cron ab exactly us din ek baar fire karta (`getDueSubscriptions`→`getDueReminders`). ⚠️ **Migration run karni hogi warna add/edit fail (column missing).** Playwright se dropdown verify.
+- **2026-06-07** — Commit `38c111c` (47 files). **Push + Vercel deploy + env secrets done — app LIVE.** Bacha: prod migration confirm, cron/URL verify, Phase 5 WhatsApp.
