@@ -3,9 +3,10 @@
 // Design principle: the rest of the app (db + dates + cron) is channel-agnostic.
 // It hands a DueSubscription to notify(); HOW it's delivered lives here.
 //
-// notify() AUTO-ROUTES:
+// notify() AUTO-ROUTES (first configured channel wins):
+//   - Twilio WhatsApp when all TWILIO_* env vars are set,
 //   - WhatsApp (Meta Cloud API) when all WHATSAPP_* env vars are set,
-//   - otherwise a console stub (dev / before WhatsApp is configured).
+//   - otherwise a console stub (dev / before any channel is configured).
 // No code change needed to go live — just set the env vars (see .env.example).
 
 import type { DueSubscription } from "@/lib/types";
@@ -22,13 +23,23 @@ function buildMessage(reminder: DueSubscription): string {
   return `⏰ ${reminder.name}: ${amount}/${reminder.cycle} charge ${when} (on ${reminder.next_billing_date})`;
 }
 
-/** True only when every WhatsApp env var is present. */
+/** True only when every Meta WhatsApp env var is present. */
 function isWhatsAppConfigured(): boolean {
   return Boolean(
     process.env.WHATSAPP_TOKEN &&
       process.env.WHATSAPP_PHONE_NUMBER_ID &&
       process.env.WHATSAPP_TO &&
       process.env.WHATSAPP_TEMPLATE,
+  );
+}
+
+/** True only when every Twilio WhatsApp env var is present. */
+function isTwilioConfigured(): boolean {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_FROM &&
+      process.env.TWILIO_TO,
   );
 }
 
@@ -39,7 +50,9 @@ function isWhatsAppConfigured(): boolean {
 export async function notify(reminder: DueSubscription): Promise<void> {
   const message = buildMessage(reminder);
 
-  if (isWhatsAppConfigured()) {
+  if (isTwilioConfigured()) {
+    await sendTwilioWhatsApp(message);
+  } else if (isWhatsAppConfigured()) {
     await sendWhatsApp(message);
   } else {
     console.log(message);
@@ -96,5 +109,55 @@ export async function sendWhatsApp(message: string): Promise<void> {
   if (!res.ok) {
     const detail = await res.text().catch(() => "<no body>");
     throw new Error(`WhatsApp send failed (${res.status}): ${detail}`);
+  }
+}
+
+/** Ensure a phone value carries Twilio's required "whatsapp:" channel prefix. */
+function toWhatsAppAddress(value: string): string {
+  return value.startsWith("whatsapp:") ? value : `whatsapp:${value}`;
+}
+
+/**
+ * Send `message` as a WhatsApp message via the Twilio API.
+ *
+ * Unlike Meta's Cloud API, Twilio's sandbox accepts free-form text (no approved
+ * template needed) as long as the recipient has joined the sandbox and is inside
+ * the 24h session window — so we send the reminder text directly as the body.
+ *
+ * TWILIO_FROM is your Twilio WhatsApp sender (the sandbox number is
+ * +14155238886); TWILIO_TO is your destination number in E.164 (e.g.
+ * +919876543210). The "whatsapp:" prefix is added automatically if omitted.
+ */
+export async function sendTwilioWhatsApp(message: string): Promise<void> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM;
+  const to = process.env.TWILIO_TO;
+
+  if (!sid || !token || !from || !to) {
+    throw new Error("Twilio env not fully configured.");
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
+  const auth = Buffer.from(`${sid}:${token}`).toString("base64");
+
+  const body = new URLSearchParams({
+    From: toWhatsAppAddress(from),
+    To: toWhatsAppAddress(to),
+    Body: message,
+  });
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "<no body>");
+    throw new Error(`Twilio WhatsApp send failed (${res.status}): ${detail}`);
   }
 }
